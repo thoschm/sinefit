@@ -21,7 +21,7 @@ typedef unsigned int uint;
 /////////////////////////////////
 // NAMESPACE
 /////////////////////////////////
-namespace Predictor
+namespace SineFit
 {
 
 

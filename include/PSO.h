@@ -11,7 +11,6 @@
 #include <iostream>
 #include <fstream>
 #include <string.h>
-#include <pthread.h>
 
 
 /////////////////////////////////
@@ -23,106 +22,9 @@ typedef unsigned int uint;
 /////////////////////////////////
 // NAMESPACE
 /////////////////////////////////
-namespace Predictor
+namespace SineFit
 {
 
-/////////////////////////////////
-// WORKER POOL
-/////////////////////////////////
-/*
-class WorkerPool
-{
-    WorkerPool(const WorkerPool &other);
-    WorkerPool &operator=(const WorkerPool &other);
-public:
-    struct Context
-    {
-        pthread_t tid;
-        uint id;
-        bool *alive;
-        void (*fptr)(const uint, void *);
-        pthread_barrier_t *barrier1,
-                          *barrier2;
-        void *payload;
-    };
-
-    WorkerPool() : mWorkers(0), mpl(NULL), mAlive(true)
-    { }
-
-    void create(uint workers, void (*extfunc)(const uint, void *), void *payload)
-    {
-        mWorkers = workers;
-        // create barriers
-        pthread_barrier_init(&mFirst, NULL, workers + 1u);
-        pthread_barrier_init(&mSecond, NULL, workers + 1u);
-        // create threads
-        mpl = new Context[mWorkers];
-        for (uint i = 0; i < mWorkers; ++i)
-        {
-            mpl[i].id = i;
-            mpl[i].alive = &mAlive;
-            mpl[i].fptr = extfunc;
-            mpl[i].barrier1 = &mFirst;
-            mpl[i].barrier2 = &mSecond;
-            mpl[i].payload = payload;
-            pthread_create(&mpl[i].tid, NULL, func, (void *)&mpl[i]);
-        }
-    }
-
-    void startJob()
-    {
-        pthread_barrier_wait(&mFirst);
-    }
-
-    void waitDone()
-    {
-        pthread_barrier_wait(&mSecond);
-    }
-
-    ~WorkerPool()
-    {
-        // destroy threads
-        mAlive = false;
-        startJob();
-        for (uint i = 0; i < mWorkers; ++i)
-        {
-            pthread_join(mpl[i].tid, NULL);
-        }
-        delete[] mpl;
-        // destroy barriers
-        pthread_barrier_destroy(&mFirst);
-        pthread_barrier_destroy(&mSecond);
-    }
-
-private:
-    static void *func(void *ptr)
-    {
-        Context *context = (Context *)ptr;
-        for ( ; ; )
-        {
-            // barrier 1
-            pthread_barrier_wait(context->barrier1);
-            // check if alive
-            if (*(context->alive) == false)
-            {
-                break;
-            }
-            // do work
-            context->fptr(context->id, context->payload);
-            // barrier 2
-            pthread_barrier_wait(context->barrier2);
-        }
-        std::cerr << "thread " << context->id  << " terminated" << std::endl;
-        return NULL;
-    }
-
-    uint mWorkers;
-    Context *mpl;
-    pthread_barrier_t mFirst,
-                      mSecond;
-    bool mAlive;
-};
-*/
 
 /////////////////////////////////
 // Particle
@@ -141,10 +43,6 @@ struct Particle
 /////////////////////////////////
 // PSO class
 /////////////////////////////////
-//#define PSO_MT
-#define PSO_OMP
-//#define THREADS 4u
-
 template <typename NumericalType, int Dim>
 class PSO
 {
@@ -152,20 +50,6 @@ class PSO
     PSO &operator=(const PSO &other);
 
 public:
-
-#ifdef PSO_MT
-    struct WorkerArgs
-    {
-        uint dim,
-             range,
-             partCnt,
-             threads;
-        NumericalType (*function)(const NumericalType *, const uint, const void *);
-        const void *payload;
-        Particle<NumericalType, Dim> *particles;
-    };
-#endif
-
     // alloc particles
     PSO(const uint particleCount,
         NumericalType (*scoreFunction)(const NumericalType *, const uint, const void *),
@@ -184,18 +68,6 @@ public:
 
         memset(mBestPos, 0, Dim * sizeof(NumericalType));
         mParticles = new Particle<NumericalType, Dim>[particleCount];
-
-#ifdef PSO_MT
-        const uint threads = std::min(THREADS, particleCount);
-        mArgs.dim = Dim;
-        mArgs.range = particleCount / threads;
-        mArgs.partCnt = particleCount;
-        mArgs.threads = threads;
-        mArgs.particles = mParticles;
-        mArgs.function = scoreFunction;
-        mArgs.payload = payload;
-        mPool.create(threads, worker, (void *)&mArgs);
-#endif
     }
 
     // release particles
@@ -250,13 +122,6 @@ public:
     // one optimization step
     NumericalType step()
     {
-#ifdef PSO_MT
-        mPool.startJob();
-        mPool.waitDone();
-#else
-#ifdef PSO_OMP
-#pragma omp parallel for
-#endif
         for (uint i = 0; i < mParticleCount; ++i)
         {
             // for each particle
@@ -265,7 +130,6 @@ public:
             // compute cost
             par.tmp = scoreFunc(par.x, Dim, mPayload);
         }
-#endif
 
         for (uint i = 0; i < mParticleCount; ++i)
         {
@@ -301,25 +165,6 @@ public:
         }
         return mBestScore;
     }
-
-#ifdef PSO_MT
-    // called by thread
-    static void worker(const uint id, void *ptr)
-    {
-        WorkerArgs *args = (WorkerArgs *)ptr;
-
-        // compute limits
-        uint low = id * args->range,
-             high = (id == args->threads - 1u) ? (args->partCnt) : ((id + 1u) * args->range);
-
-        // process range
-        for (uint i = low; i < high; ++i)
-        {
-            Particle<NumericalType, Dim> &par = args->particles[i];
-            par.tmp = args->function(par.x, args->dim, args->payload);
-        }
-    }
-#endif
 
     // get particle pointer
     const Particle<NumericalType, Dim> *getParticles()
@@ -393,11 +238,6 @@ protected:
     // Swarm
     NumericalType mBestPos[Dim],
                   mBestScore;
-
-#ifdef PSO_MT
-    WorkerPool mPool;
-    WorkerArgs mArgs;
-#endif
 };
 
 }
