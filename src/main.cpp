@@ -73,8 +73,15 @@ int main(int argc, char **argv)
 
     dumpSequence(indata, "sine.txt");
 
-    SineFitter<float> fitter(100u, 10u);
-    fitter.fit(indata, 0, 0.001f, 3u);
+    SineFitter<float> fitter(100u);
+    SineParams<float> result = fitter.fit(indata, 0, 0.001f, 1000u);
+
+    std::vector<float> norm, gen;
+    fitter.copyNormalized(&norm, indata, 0);
+    fitter.generateSine(&gen, result);
+
+    dumpSequence(norm, "norm.txt");
+    dumpSequence(gen, "gen.txt");
 
 
     return 0;

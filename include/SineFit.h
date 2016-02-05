@@ -135,7 +135,7 @@ public:
         std::vector<NumericalType> window(mWindow);
         for (uint i = 0; i < mWindow; ++i)
         {
-            window[i] = scaling * (data[startAt + i] - minVal);
+            window[i] = scaling * (data[pos + i] - minVal);
         }
 
         // fill payload
@@ -146,7 +146,7 @@ public:
         // init pso, TODO: move init into ctor
         PSO<NumericalType, 5> pso(mParticles, scoreFunc, (const void *)&pl);
         pso.init(mLow, mHigh);
-        pso.print();
+        //pso.print();
 
         // optimize
         NumericalType s;
@@ -155,7 +155,7 @@ public:
         {
             std::cerr << "\roptimization error = " << s;
             if (++l == breakLoops) break;
-            pso.print();
+            //pso.print();
         }
         std::cerr << "\roptimization error = " << s << std::endl;
         const NumericalType *values = pso.getBest();
@@ -193,6 +193,40 @@ public:
             err += d * d;
         }
         return err / windowSize;
+    }
+
+    // copy normalized data into vector
+    void copyNormalized(std::vector<NumericalType> *out,
+                        const std::vector<NumericalType> &data,
+                        const uint startAt = UINT_MAX)
+    {
+        out->clear();
+        out->resize(mWindow);
+
+        // get normalization parameters
+        NumericalType minVal, scaling;
+        const uint pos = std::min(startAt, (uint)(data.size() - mWindow));
+        normalize(data, pos, &minVal, &scaling);
+
+        // copy window and normalize
+        for (uint i = 0; i < mWindow; ++i)
+        {
+            out->at(i) = scaling * (data[pos + i] - minVal);
+        }
+    }
+
+    // draw sine sequence
+    void generateSine(std::vector<NumericalType> *out,
+                      const SineParams<NumericalType> &p)
+    {
+        out->clear();
+        out->resize(mWindow);
+
+        // copy window and normalize
+        for (uint i = 0; i < mWindow; ++i)
+        {
+            out->at(i) = p.m * (NumericalType)i + p.n + p.amp * std::sin(p.freq * ((NumericalType)i + p.c));
+        }
     }
 
 private:
