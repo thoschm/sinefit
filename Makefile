@@ -1,2 +1,2 @@
 all:
-	g++ -O3 -march=native -o learn src/main.cpp -Iinclude -Wall
+	g++ -O3 -march=native -o sinefit src/main.cpp -Iinclude -Wall

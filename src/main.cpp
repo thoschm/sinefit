@@ -51,28 +51,30 @@ bool dumpSequence(const std::vector<float> &seq, const char *file)
 int main(int argc, char **argv)
 {
     // check args
-    if (argc != 3)
+    if (argc != 2)
     {
-        std::cerr << "Usage:\n   learn <sequence.txt> <devices>\n";
+        std::cerr << "Usage:\n   sinefit <sequence.txt>\n";
         return EXIT_FAILURE;
     }
 
     // load input sequence
     std::vector<float> indata;
-    if (!loadSequence(&indata, argv[1]))
+    /*if (!loadSequence(&indata, argv[1]))
     {
         return EXIT_FAILURE;
-    }
-    uint devs = atoi(argv[2]);
+    }*/
 
-/*
-    for (uint i = 0; i < 3000u; ++i)
+
+    for (uint i = 0; i < 300u; ++i)
     {
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
     }
-*/
+
 
     dumpSequence(indata, "sine.txt");
+
+    SineFitter<float> fitter(100u, 10u);
+    fitter.fit(indata, 0, 0.001f, 3u);
 
 
     return 0;

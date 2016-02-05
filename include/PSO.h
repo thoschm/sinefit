@@ -64,7 +64,7 @@ public:
         mBestScore((NumericalType)FLT_MAX)
     {
         // fix rnd
-        mRnd.setSeed(0x12345678u);
+        //mRnd.setSeed(0x12345678u);
 
         memset(mBestPos, 0, Dim * sizeof(NumericalType));
         mParticles = new Particle<NumericalType, Dim>[particleCount];
