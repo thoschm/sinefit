@@ -30,13 +30,16 @@ template <typename NumericalType>
 struct SineParams
 {
     NumericalType m, n, c,
-                  amp, freq;
+                  amp, freq,
+                  vmin, scale;
     bool success;
     SineParams() : m((NumericalType)0.0),
                    n((NumericalType)0.0),
                    c((NumericalType)0.0),
                    amp((NumericalType)0.0),
                    freq((NumericalType)0.0),
+                   vmin((NumericalType)0.0),
+                   scale((NumericalType)0.0),
                    success(false)
     { }
 };
@@ -59,10 +62,11 @@ public:
                                                               mCp(cp),
                                                               mCg(cg)
     {
+        const NumericalType wnd = windowSize;
         // prepare limits
         // m
-        mLow.push_back((NumericalType)(-1.0 / (windowSize - 1u)));
-        mHigh.push_back((NumericalType)(1.0 / (windowSize - 1u)));
+        mLow.push_back(-1.0 / (wnd - (NumericalType)1.0));
+        mHigh.push_back(1.0 / (wnd - (NumericalType)1.0));
         // n
         mLow.push_back((NumericalType)0.0);
         mHigh.push_back((NumericalType)1.0);
@@ -71,11 +75,11 @@ public:
         mHigh.push_back((NumericalType)1.0);
         // freq
         const NumericalType halfperiod = M_PI / windowSize;
-        mLow.push_back((NumericalType)(1.0 * halfperiod));
-        mHigh.push_back((NumericalType)(windowSize * halfperiod));
+        mLow.push_back((NumericalType)1.0 * halfperiod);
+        mHigh.push_back(wnd * halfperiod);
         // c
-        mLow.push_back((NumericalType)-windowSize);
-        mHigh.push_back((NumericalType)windowSize);
+        mLow.push_back(-wnd);
+        mHigh.push_back(wnd);
     }
 
 
@@ -167,6 +171,8 @@ public:
         result.amp = values[2];
         result.freq = values[3];
         result.c = values[4];
+        result.vmin = minVal;
+        result.scale = scaling;
         return result;
     }
 
@@ -226,6 +232,27 @@ public:
         for (uint i = 0; i < mWindow; ++i)
         {
             out->at(i) = p.m * (NumericalType)i + p.n + p.amp * std::sin(p.freq * ((NumericalType)i + p.c));
+        }
+    }
+
+    // copy normalized data into vector
+    void generateSine(std::vector<NumericalType> *out,
+                      const std::vector<NumericalType> &data,
+                      const SineParams<NumericalType> &p,
+                      const uint startAt = UINT_MAX)
+    {
+        out->clear();
+        out->resize(data.size(), (NumericalType)0.0);
+
+        // get normalization parameters
+        const NumericalType inv = (NumericalType)1.0 / p.scale;
+        const uint pos = std::min(startAt, (uint)(data.size() - mWindow));
+
+        // copy window and normalize
+        for (uint i = 0; i < mWindow; ++i)
+        {
+            const NumericalType f = p.m * (NumericalType)i + p.n + p.amp * std::sin(p.freq * ((NumericalType)i + p.c));
+            out->at(pos + i) = inv * f + p.vmin;
         }
     }
 

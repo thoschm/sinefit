@@ -59,26 +59,28 @@ int main(int argc, char **argv)
 
     // load input sequence
     std::vector<float> indata;
-    /*if (!loadSequence(&indata, argv[1]))
+    if (!loadSequence(&indata, argv[1]))
     {
         return EXIT_FAILURE;
-    }*/
-
-
-    for (uint i = 0; i < 300u; ++i)
-    {
-        indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
     }
 
+/*
+    for (uint i = 0; i < 100u; ++i)
+    {
+        indata.push_back(std::sqrt(1 * i) + std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
+    }
+*/
 
     dumpSequence(indata, "sine.txt");
 
-    SineFitter<float> fitter(100u);
-    SineParams<float> result = fitter.fit(indata, 0, 0.001f, 1000u);
+    SineFitter<float> fitter(1250u);
+    SineParams<float> result = fitter.fit(indata, UINT_MAX, 0.0f, 2000);
 
     std::vector<float> norm, gen;
-    fitter.copyNormalized(&norm, indata, 0);
-    fitter.generateSine(&gen, result);
+    fitter.copyNormalized(&norm, indata, UINT_MAX);
+    fitter.generateSine(&gen, indata, result, UINT_MAX);
+
+    //std::cerr << result.freq << std::endl;
 
     dumpSequence(norm, "norm.txt");
     dumpSequence(gen, "gen.txt");
