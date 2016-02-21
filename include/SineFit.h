@@ -22,6 +22,16 @@ typedef unsigned int uint;
 namespace SineFit
 {
 
+/////////////////////////////////
+// TURN RESULT
+/////////////////////////////////
+enum TurnResult
+{
+    NO_TURN,
+    UPPER_TURN,
+    LOWER_TURN
+};
+
 
 /////////////////////////////////
 // SINE FITTER
@@ -31,7 +41,8 @@ struct SineParams
 {
     NumericalType m, n, c,
                   amp, freq,
-                  vmin, scale;
+                  vmin, scale,
+                  score;
     bool success;
     SineParams() : m((NumericalType)0.0),
                    n((NumericalType)0.0),
@@ -40,6 +51,7 @@ struct SineParams
                    freq((NumericalType)0.0),
                    vmin((NumericalType)0.0),
                    scale((NumericalType)0.0),
+                   score((NumericalType)0.0),
                    success(false)
     { }
 };
@@ -165,6 +177,7 @@ public:
         const NumericalType *values = pso.getBest();
 
         // fill return struct
+        result.score = s;
         result.success = true;
         result.m = values[0];
         result.n = values[1];
@@ -254,6 +267,17 @@ public:
             const NumericalType f = p.m * (NumericalType)i + p.n + p.amp * std::sin(p.freq * ((NumericalType)i + p.c));
             out->at(pos + i) = inv * f + p.vmin;
         }
+    }
+
+    // check turn
+    TurnResult checkTurn(const SineParams<NumericalType> &p,
+                         const NumericalType confidence = (NumericalType)0.9)
+    {
+        const uint i = mWindow - 1u;
+        const NumericalType f = std::sin(p.freq * ((NumericalType)i + p.c));
+        if (f >  confidence) return UPPER_TURN;
+        if (f < -confidence) return LOWER_TURN;
+        return NO_TURN;
     }
 
 private:
