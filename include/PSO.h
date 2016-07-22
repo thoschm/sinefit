@@ -11,6 +11,7 @@
 #include <iostream>
 #include <fstream>
 #include <string.h>
+#include <assert.h>
 
 
 /////////////////////////////////
@@ -29,21 +30,34 @@ namespace SineFit
 /////////////////////////////////
 // Particle
 /////////////////////////////////
-template <typename NumericalType, int Dim>
-struct Particle
+template <typename NumericalType>
+class Particle
 {
-    NumericalType x[Dim],
-                  v[Dim],
-                  best[Dim],
-                  score,
+public:
+    Particle(const uint dim) : score((NumericalType)FLT_MAX),
+                               tmp((NumericalType)FLT_MAX),
+                               mDim(dim)
+    {
+        x.resize(dim, (NumericalType)FLT_MAX);
+        v.resize(dim, (NumericalType)FLT_MAX);
+        best.resize(dim, (NumericalType)FLT_MAX);
+    }
+
+    std::vector<NumericalType> x,
+                               v,
+                               best;
+    NumericalType score,
                   tmp;
+
+protected:
+    uint mDim;
 };
 
 
 /////////////////////////////////
 // PSO class
 /////////////////////////////////
-template <typename NumericalType, int Dim>
+template <typename NumericalType>
 class PSO
 {
     PSO(const PSO &other);
@@ -51,29 +65,25 @@ class PSO
 
 public:
     // alloc particles
-    PSO(const uint particleCount,
-        NumericalType (*scoreFunction)(const NumericalType *, const uint, const void *),
+    PSO(const uint dim,
+        const uint particleCount,
+        NumericalType (*scoreFunction)(const std::vector<NumericalType> *, const void *),
         const void *payload) :
+        mDim(dim),
         mParticleCount(particleCount),
-        mParticles(NULL),
         scoreFunc(scoreFunction),
         mPayload(payload),
-        mW((NumericalType)0.0),
-        mCP((NumericalType)0.0),
-        mCG((NumericalType)0.0),
+        mW((NumericalType)FLT_MAX),
+        mCP((NumericalType)FLT_MAX),
+        mCG((NumericalType)FLT_MAX),
         mBestScore((NumericalType)FLT_MAX)
     {
         // fix rnd
-        //mRnd.setSeed(0x12345678u);
+        mRnd.setSeed(0x12345678u);
 
-        memset(mBestPos, 0, Dim * sizeof(NumericalType));
-        mParticles = new Particle<NumericalType, Dim>[particleCount];
-    }
-
-    // release particles
-    ~PSO()
-    {
-        delete[] mParticles;
+        // alloc
+        mBestPos.resize(dim, (NumericalType)FLT_MAX);
+        mParticles.resize(particleCount, Particle<NumericalType>(dim));
     }
 
     // init
@@ -84,11 +94,7 @@ public:
               const NumericalType cg = (NumericalType)1.4)
     {
         // check
-        if (lowerLimits.size() != Dim || upperLimits.size() != Dim)
-        {
-            std::cerr << "invalid limit vector!\n";
-            return;
-        }
+        assert(lowerLimits.size() == mDim && upperLimits.size() == mDim);
 
         // params
         mW = w;
@@ -99,12 +105,12 @@ public:
         for (uint i = 0; i < mParticleCount; ++i)
         {
             // for each particle
-            Particle<NumericalType, Dim> &par = mParticles[i];
+            Particle<NumericalType> &par = mParticles[i];
             par.score = (NumericalType)FLT_MAX;
             par.tmp = (NumericalType)FLT_MAX;
 
             // init
-            for (uint d = 0; d < Dim; ++d)
+            for (uint d = 0; d < mDim; ++d)
             {
                 // x, v, best
                 const NumericalType diff = upperLimits[d] - lowerLimits[d];
@@ -116,42 +122,46 @@ public:
 
         // reset swarm
         mBestScore = (NumericalType)FLT_MAX;
-        memset(mBestPos, 0, Dim * sizeof(NumericalType));
+        std::fill(mBestPos.begin(), mBestPos.end(), (NumericalType)0.0);
     }
 
     // one optimization step
     NumericalType step()
     {
+        // check
+        assert(mW != (NumericalType)FLT_MAX);
+
+        // compute scores
         for (uint i = 0; i < mParticleCount; ++i)
         {
             // for each particle
-            Particle<NumericalType, Dim> &par = mParticles[i];
+            Particle<NumericalType> &par = mParticles[i];
 
             // compute cost
-            par.tmp = scoreFunc(par.x, Dim, mPayload);
+            par.tmp = scoreFunc(&(par.x), mPayload);
         }
 
         for (uint i = 0; i < mParticleCount; ++i)
         {
             // for each particle
-            Particle<NumericalType, Dim> &par = mParticles[i];
+            Particle<NumericalType> &par = mParticles[i];
 
             // update scores
             if (par.tmp < par.score)
             {
                 par.score = par.tmp;
-                memcpy(par.best, par.x, Dim * sizeof(NumericalType));
+                par.best = par.x;
 
                 // swarm
                 if (par.tmp < mBestScore)
                 {
                     mBestScore = par.tmp;
-                    memcpy(mBestPos, par.x, Dim * sizeof(NumericalType));
+                    mBestPos = par.x;
                 }
             }
 
             // update position x
-            for (uint d = 0; d < Dim; ++d)
+            for (uint d = 0; d < mDim; ++d)
             {
                 // uniform random values
                 const NumericalType rp = mRnd.uniform(),
@@ -167,13 +177,13 @@ public:
     }
 
     // get particle pointer
-    const Particle<NumericalType, Dim> *getParticles()
+    const Particle<NumericalType> &getParticles()
     {
         return mParticles;
     }
 
     // get current best
-    const NumericalType *getBest()
+    const std::vector<NumericalType> &getBest()
     {
         return mBestPos;
     }
@@ -188,7 +198,7 @@ public:
     {
         std::cerr << "best score: " << mBestScore << std::endl;
         std::cerr << "best pos..: ";
-        for (uint i = 0; i < Dim; ++i)
+        for (uint i = 0; i < mDim; ++i)
         {
             std::cerr << mBestPos[i] << " ";
         }
@@ -196,8 +206,8 @@ public:
         std::cerr << "particles.: " << std::endl;
         for (uint i = 0; i < mParticleCount; ++i)
         {
-            const Particle<NumericalType, Dim> &par = mParticles[i];
-            for (uint d = 0; d < Dim; ++d)
+            const Particle<NumericalType> &par = mParticles[i];
+            for (uint d = 0; d < mDim; ++d)
             {
                 std::cerr << par.x[d] << " ";
             }
@@ -213,8 +223,8 @@ public:
         of.open(file, std::ios::out);
         for (uint i = 0; i < mParticleCount; ++i)
         {
-            const Particle<NumericalType, Dim> &par = mParticles[i];
-            for (uint d = 0; d < Dim; ++d)
+            const Particle<NumericalType> &par = mParticles[i];
+            for (uint d = 0; d < mDim; ++d)
             {
                 of << par.x[d] << " ";
             }
@@ -224,9 +234,9 @@ public:
     }
 
 protected:
-    uint mParticleCount;
-    Particle<NumericalType, Dim> *mParticles;
-    NumericalType (*scoreFunc)(const NumericalType *, const uint, const void *);
+    uint mDim, mParticleCount;
+    std::vector<Particle<NumericalType> > mParticles;
+    NumericalType (*scoreFunc)(const std::vector<NumericalType> *, const void *);
     const void *mPayload;
     XorShift<NumericalType> mRnd;
 
@@ -236,8 +246,8 @@ protected:
                   mCG; // group best weight
 
     // Swarm
-    NumericalType mBestPos[Dim],
-                  mBestScore;
+    std::vector<NumericalType> mBestPos;
+    NumericalType mBestScore;
 };
 
 }

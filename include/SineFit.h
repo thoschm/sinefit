@@ -160,7 +160,7 @@ public:
         pl.sequence = &window;
 
         // init pso, TODO: move init into ctor
-        PSO<NumericalType, 5> pso(mParticles, scoreFunc, (const void *)&pl);
+        PSO<NumericalType> pso(5u, mParticles, scoreFunc, (const void *)&pl);
         pso.init(mLow, mHigh);
         //pso.print();
 
@@ -174,7 +174,7 @@ public:
             //pso.print();
         }
         std::cerr << "\roptimization error = " << s << std::endl;
-        const NumericalType *values = pso.getBest();
+        const std::vector<NumericalType> &values = pso.getBest();
 
         // fill return struct
         result.score = s;
@@ -191,18 +191,18 @@ public:
 
 
     // compute score for a single particle
-    static NumericalType scoreFunc(const NumericalType *values, const uint dim, const void *payload)
+    static NumericalType scoreFunc(const std::vector<NumericalType> *values, const void *payload)
     {
         // get payload
         const Payload *pl = (const Payload *)payload;
         // extract parameters
         const uint windowSize = pl->elements;
         const std::vector<NumericalType> *data = pl->sequence;
-        const NumericalType m = values[0],
-                            n = values[1],
-                            amp = values[2],
-                            freq = values[3],
-                            c = values[4];
+        const NumericalType m = values->at(0),
+                            n = values->at(1),
+                            amp = values->at(2),
+                            freq = values->at(3),
+                            c = values->at(4);
         // compute error
         NumericalType err = (NumericalType)0.0;
         for (uint i = 0; i < windowSize; ++i)
